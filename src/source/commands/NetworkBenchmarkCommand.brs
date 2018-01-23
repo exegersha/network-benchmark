@@ -21,7 +21,7 @@ function NetworkBenchmarkCommand()
 
     id = 868
 
-    m._mainViewMediator.addText("TRIGERRING "+ (m._totalRequests + 1).toStr() +" REQUESTS...")
+    m._mainViewMediator.addText("TRIGGERING "+ (m._totalRequests + 1).toStr() +" REQUESTS...")
 
     m._initialTimestap = m._dateUtils.getTimeStamp()
 
