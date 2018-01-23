@@ -29,7 +29,8 @@ function GetMainViewMediator () as Object
     '/// PRIVATE PROPERTIES ///
     '////////////////////////////////////////////////
 
-    prototype._mainContainer = Invalid
+    'prototype._mainContainer = Invalid
+    'print "<GetMainViewMediator> INIT _mainContainer=Invalid"
 
     '///////////////////////////////////////////
     '/// PRIVATE METHODS ///

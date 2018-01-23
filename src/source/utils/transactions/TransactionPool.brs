@@ -67,14 +67,19 @@ function GetTransactionPool() as Object
     end function
 
     prototype._configureTransaction = function (transaction as Object, request as Object) as Void
-      transaction.observeField("response", "TransactionPool_transactionComplete")
+      transaction.observeField("response", AppContext().messagePort)
+      MessageBus().addEventListener(transaction.id + "_response_Event", "TransactionPool_transactionComplete", m)
+
+
       transaction.request = request.convertToJson()
       transaction.control = "RUN"
-      transaction.observeField("state", "TransactionPool_stateChanged")
+      
+      transaction.observeField("state", AppContext().messagePort)
+      MessageBus().addEventListener(transaction.id + "_state_Event", "TransactionPool_stateChanged", m)
     end function
 
-    prototype._recycle = function (transaction as Object) as Void
-      transactionId = transaction.id
+    prototype._recycle = function (transactionId as String) as Void
+      transaction = m._activeTransactionPool.Lookup(transactionId)
       m._activeRequestQueue.Delete(transactionId)
       transaction.unobserveField("response")
       transaction.unobserveField("state")
@@ -88,24 +93,25 @@ function GetTransactionPool() as Object
       m._processQueue()
     end function
 
+    prototype.TransactionPool_transactionComplete = function(payload as Object) as Void
+      'print "<TransactionPool>.TransactionPool_transactionComplete payload.id=";payload.id
+      transactionId = payload.id
+      request =  m.getRequest(transactionId)
+      request.setResponse(payload.data)
+      completeHandler = request.getTransactionCompleteHandler()
+      completeHandler.callback(completeHandler.context, transactionId)
+    end function
+
+    prototype.TransactionPool_stateChanged = function(payload as Object) as Void
+      'print "<TransactionPool>.TransactionPool_stateChanged payload.id=";payload.id
+      if payload.data = "stop"
+        GetTransactionPool().recycle(payload.id)
+      end if
+    end function
+
     m._transactionPoolSingleton = prototype
   end if
   return m._transactionPoolSingleton
-end function
-
-function TransactionPool_transactionComplete (sgNodeEvt as Object) as Void
-  transactionId = sgNodeEvt.getNode()
-  request =  GetTransactionPool().getRequest(transactionId)
-  request.setResponse(sgNodeEvt.getData())
-  completeHandler = request.getTransactionCompleteHandler()
-  completeHandler.callback(completeHandler.context, transactionId)
-end function
-
-function TransactionPool_stateChanged(event) as Void
-  if event.getData() = "stop"
-    transaction = event.getRoSGNode()
-    GetTransactionPool().recycle(transaction)
-  end if
 end function
 
 function TransactionPool_destroy() as Void

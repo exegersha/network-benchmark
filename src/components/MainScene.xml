@@ -4,28 +4,34 @@
 
 <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 
-<!-- Transactions -->
-<script type="text/brightscript" uri="pkg:/source/utils/transactions/TransactionPool.brs" />
+<!-- Mediators -->
+<script type="text/brightscript" uri="pkg:/source/mediator/MainViewMediator.brs" />
+<script type="text/brightscript" uri="pkg:/source/events/EventDispatcher.brs" />
 
 <!-- Commands -->
 <script type="text/brightscript" uri="pkg:/source/commands/NetworkBenchmarkCommand.brs" />
 
-<!-- Services -->
+
+<!--
+<script type="text/brightscript" uri="pkg:/source/utils/transactions/TransactionPool.brs" />
+
+
+<script type="text/brightscript" uri="pkg:/source/commands/NetworkBenchmarkCommand.brs" />
+
+
 <script type="text/brightscript" uri="pkg:/source/services/GetHttpRequest.brs" />
 <script type="text/brightscript" uri="pkg:/source/services/ItemsService.brs" />
 <script type="text/brightscript" uri="pkg:/source/services/API/ItemsAPI.brs" />
 <script type="text/brightscript" uri="pkg:/source/services/TransactionService.brs" />
 
-<!-- Events -->
+
 <script type="text/brightscript" uri="pkg:/source/events/EventDispatcher.brs" />
 
-<!-- Utils -->
+
 <script type="text/brightscript" uri="pkg:/source/utils/debug/Debug.brs" />
 <script type="text/brightscript" uri="pkg:/source/utils/GuidGenerator.brs" />
 <script type="text/brightscript" uri="pkg:/source/utils/DateUtils.brs" />
-
-<!-- Mediators -->
-<script type="text/brightscript" uri="pkg:/source/mediator/MainViewMediator.brs" />
+-->
 
 
 <children>
@@ -35,11 +41,11 @@
     vertAlign="top"
     translation="[40,60]"
     font="font:SmallestSystemFont"
-  />
+    />
 	<Label
-    id="indexLabel"
-    text="Time running (in seconds): 0"
-    translation="[550,30]"
+		id="indexLabel"
+		text="Time running (in seconds): 0"
+		translation="[550,30]"
     font="font:SmallestSystemFont" />
 </children>
 

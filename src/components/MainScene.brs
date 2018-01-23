@@ -11,16 +11,10 @@ sub init()
   scrollText.height = deviceInfo.GetUIResolution().height - 80
   scrollText.setFocus(true)
 
-  screenMediator = GetMainViewMediator()
-  screenMediator.setMainContainer(m.top.findNode("scrollText"))
-
   m.indexLabel = m.top.findNode("indexLabel")
   m.simpleTask = CreateObject("roSGNode", "SimpleTask")
   m.simpleTask.ObserveField("index", "onIndexChanged")
   m.simpleTask.control = "RUN"
-
-  GetTransactionPool().init()
-  NetworkBenchmarkCommand().execute()
 end sub
 
 function onIndexChanged() as void
