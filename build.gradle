@@ -1,0 +1,823 @@
+import org.gradle.api.tasks.Exec
+import java.net.URLDecoder;
+
+task bambooTest(type: BambooTestTask)
+task bambooStaging(type: BambooStagingTask)
+task bambooProduction(type: BambooProductionTask)
+task bambooPublicChannel(type: BambooPublicChannelTask)
+
+task bambooZipTest(type: BambooZipTestTask)
+task bambooZipStaging(type: BambooZipStagingTask)
+task bambooZipProduction(type: BambooZipProductionTask)
+
+task buildTest(type: BuildTestTask)
+task installTest(type: InstallTestTask)
+
+task buildStaging(type: BuildStagingTask)
+task installStaging(type: InstallStagingTask)
+
+task buildProduction(type: BuildProductionTask)
+task installProduction(type: InstallProductionTask)
+
+task deeplink(type: DeeplinkTask)
+
+task packageApp(type: PackagingTask)
+
+task packagingPublicChannel(type: PackagingPublicChannelTask)
+
+task rekey(type: RekeyTask)
+
+task screenshot(type: ScreenshotTask)
+
+task globalSearch(type: GlobaSearchTask)
+
+
+// bamboo build for test environment
+class BambooTestTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bamboo = project.task('bamboo', type: BambooTask)
+		bamboo.bambooBuild('test', false)
+	}
+}
+
+// bamboo build for staging environment
+class BambooStagingTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bamboo = project.task('bamboo', type: BambooTask)
+		bamboo.bambooBuild('staging', false)
+	}
+}
+
+// bamboo build for production environment
+class BambooProductionTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bamboo = project.task('bamboo', type: BambooTask)
+		bamboo.bambooBuild('production', false)
+	}
+}
+
+// bamboo build for public channel
+class BambooPublicChannelTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bamboo = project.task('bamboo', type: BambooTask)
+		bamboo.bambooBuild('production', true)
+	}
+}
+
+// zip output folder to bamboo folder
+class BambooZipTestTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bambooZip = project.task('bambooZip', type: BambooZipTask)
+		bambooZip.zipAll('test')
+	}
+}
+class BambooZipStagingTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bambooZip = project.task('bambooZip', type: BambooZipTask)
+		bambooZip.zipAll('staging')
+	}
+}
+class BambooZipProductionTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def bambooZip = project.task('bambooZip', type: BambooZipTask)
+		bambooZip.zipAll('production')
+	}
+}
+
+// build test app and upload it to the defined roku box
+class BambooTask extends DefaultTask {
+	def bambooPackage
+	def bambooBuild(String envTarget, Boolean publicChannel) {
+		bambooPackage = project.task("bambooPackage", type: PackagingTask)
+		bambooPackage.packageForEnvironment(envTarget, publicChannel)
+	}
+}
+class BambooZipTask extends DefaultTask {
+	def zipAll(String envTarget) {
+		def outputDir = new File("output/")
+		def bambooDir = new File("bamboo/")
+		if( !bambooDir.exists() ) {
+			if(bambooDir.mkdirs()) {
+				//println("succeeded in making folder")
+			}
+		}		
+		def finalZip = "bamboo_build_" + envTarget + ".zip"
+
+		project.task("bambooFinalZip", type: Zip) {
+			destinationDir = bambooDir
+			archiveName finalZip
+			from outputDir
+		}.execute()
+
+		println "bamboo zip file ready."
+	}
+}
+
+// build test app and upload it to the defined roku box
+class InstallTestTask extends DefaultTask {
+	@TaskAction
+	def installtest() {
+		println "Build and install app on roku (Test environment)"
+		
+		println "0. Init variables"
+		def initForInstall = project.task('initForInstall', type: InitVariablesTask)
+		initForInstall.execute()
+
+		println "1. Build app"
+		def buildTestForInstall = project.task('buildTestForInstall', type: BuildTestTask)
+		buildTestForInstall.build()
+
+		println "2. Install on roku box "
+		def uploadForInstall = project.task('uploadForInstall', type: UploadTask)
+		uploadForInstall.execute()
+	}
+}
+
+// build staging app and upload it to the defined roku box
+class InstallStagingTask extends DefaultTask {
+	@TaskAction
+	def installStaging() {
+		println "Build and install app on roku (Staging environment)"
+		
+		println "0. Init variables"
+		def initForInstall = project.task('initForInstall', type: InitVariablesTask)
+		initForInstall.execute()
+
+		println "1. Build app"
+		def buildStagingForInstall = project.task('buildStagingForInstall', type: BuildStagingTask)
+		buildStagingForInstall.build()
+
+		println "2. Install on roku box "
+		def uploadForInstall = project.task('uploadForInstall', type: UploadTask)
+		uploadForInstall.execute()
+	}
+}
+
+// build staging app and upload it to the defined roku box
+class InstallProductionTask extends DefaultTask {
+	@TaskAction
+	def installProduction() {
+		println "Build and install app on roku (Production environment)"
+		
+		println "0. Init variables"
+		def initForInstall = project.task('initForInstall', type: InitVariablesTask)
+		initForInstall.execute()
+
+		println "1. Build app"
+		def buildProductionForInstall = project.task('buildProductionForInstall', type: BuildProductionTask)
+		buildProductionForInstall.build()
+
+		println "2. Install on roku box "
+		def uploadForInstall = project.task('uploadForInstall', type: UploadTask)
+		uploadForInstall.execute()
+	}
+}
+
+class UploadTask extends DefaultTask {
+	@TaskAction
+	def uploadZipOnRoku() {
+		// check wether login is necessary
+		def proc = ['curl', '--silent', '--write-out', '"%{http_code}"', project.ext.get("rokuIP")].execute()
+
+		if (proc.text == '"401"') {
+			println "3. Upload to roku " + project.ext.get("rokuIP") + " with authentication"
+			def uploadCmd = new ByteArrayOutputStream().withStream { os ->
+				def result = project.exec {
+					executable "curl"
+					standardOutput = os
+					args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+					args "--digest"
+					args "-s"
+					args "-S"
+					args "-F", "mysubmit=Install"
+					args "-F", "archive=@output/" + project.ext.get("archiveName")
+					args "-F", "passwd="
+					args "http://" + project.ext.get("rokuIP") + "/plugin_install"
+				}
+			}
+			println uploadCmd
+		} else {
+			println "3. Upload to roku " + project.ext.get("rokuIP") + " without authentication"
+			def uploadCmd = new ByteArrayOutputStream().withStream { os ->
+				def result = project.exec {
+					executable "curl"
+					standardOutput = os
+					args "-s"
+					args "-S"
+					args "-F", "mysubmit=Install"
+					args "-F", "archive=@output/" + project.ext.get("archiveName")
+					args "-F", "passwd="
+					args "http://" + project.ext.get("rokuIP") + "/plugin_install"
+				}
+			}
+			println uploadCmd
+		}
+	}
+}
+
+// define project variables
+class InitVariablesTask extends DefaultTask {
+	@TaskAction
+	def init() {
+		def sessionName = System.getProperty("user.name", "localhost")
+
+		def rokuIP = ""
+
+		// loop users to find session
+		def users = project.properties.users.trim().split(",")
+		for(String user:users) {
+			def List temp = user.split("-")
+			//println "user " + user
+			//println "temp0 " + temp[0]+ ", temp1 " + temp[1]
+			if (temp[0] == sessionName) rokuIP = temp[1]
+		}
+
+		println " ****** roku IP " + rokuIP
+		
+		if (rokuIP == "")
+			throw new GradleException("Please add your session ID in gradle.properties, your session name: '" + sessionName + "'\nYou'll need it to upload builds to your roku. ")
+		else
+			project.ext.set("rokuIP", rokuIP)
+
+	}
+}
+
+// build test app
+class BuildTestTask extends DefaultTask {
+	@TaskAction
+	def build() {
+		project.ext.set("buildEnv", "test")
+
+		def projTasksBuild = project.task('preparebuild', type: ProjectTasks)
+		projTasksBuild.envPath ='target/test/'
+		projTasksBuild.buildProject()
+	}
+}
+
+// build staging app
+class BuildStagingTask extends DefaultTask {
+	@TaskAction
+	def build() {
+		project.ext.set("buildEnv", "staging")
+
+		def projTasksBuild = project.task('preparebuild', type: ProjectTasks)
+		projTasksBuild.envPath ='target/staging/'
+		projTasksBuild.buildProject()
+	}
+}
+
+// build production app
+class BuildProductionTask extends DefaultTask {
+	@TaskAction
+	def build() {
+		project.ext.set("buildEnv", "production")
+
+		def projTasksBuild = project.task('preparebuild', type: ProjectTasks)
+		projTasksBuild.envPath ='target/production/'
+		projTasksBuild.buildProject()
+	}
+}
+
+class ProjectTasks extends DefaultTask {
+	String envPath = ""
+
+	def appMajorVersion = "0"
+	def appMinorVersion = "0"
+	def appBuildNumber = "0"
+
+	def tempDir = new File("output/", "temp")
+	def outputDir = new File("output/")
+
+	//def manifestFile = project.file("manifest")
+	def sourcesFiles = project.fileTree(dir: 'src', includes: ['**/*.brs', '**/*.xml'])
+	def resourcesFiles = project.fileTree(dir: 'resources', include: '**/*')
+	
+	void buildProject() {
+		if (!project.ext.has("publicChannel"))
+		{
+			project.ext.set("publicChannel", false)
+		}
+
+		resolveAppversion()
+
+		createTemp()
+		copyResources()
+		copyEnvResources()
+		copyManifest()
+		
+		//props.title = props.title + " " + project.ext.get("buildEnv")
+		//props.store(manifestFile.newWriter(), null)
+
+		// remove traces and loggers for production build
+		if (project.ext.get("buildEnv") == "production"){
+			println "removeTraces for production build"
+			//removeTraces()
+		}
+		
+		zipTemp()
+		destroyTemp()
+	}
+
+	void resolveAppversion() {
+		def majNumber = System.getenv("bamboo_MajorVersion")
+		if (majNumber != null) appMajorVersion = majNumber
+
+		def minNumber = System.getenv("bamboo_MinorVersion")
+		if (minNumber != null) appMinorVersion = minNumber
+
+		def buildNumber = System.getenv("bamboo_VersionBuildNumber")
+		if (buildNumber != null) appBuildNumber = buildNumber
+	}
+
+	void copyManifest(){
+		def env = project.ext.get("buildEnv")
+		def isPublicChannel = project.ext.get("publicChannel")
+
+		// parse original manifest to create output one
+		def Properties props = new Properties()
+		def srcManifestFile = project.file("manifest")
+		props.load(new FileInputStream(srcManifestFile))
+
+		def destManifestFile = project.file(project.properties.tempDirProp + "/manifest")
+		destManifestFile.createNewFile()
+		FileWriter fileWriter = new FileWriter(destManifestFile, true)
+
+		println System.getenv()
+
+		props.each { variable, value ->
+			if (variable == "title" && !isPublicChannel) value += " " + env
+			if (variable == "major_version") value = appMajorVersion
+			if (variable == "minor_version") value = appMinorVersion
+			if (variable == "build_version") value = appBuildNumber
+			
+	    	fileWriter.write(variable + "=" + value + "\n");
+		}
+		fileWriter.close();
+	}
+
+	void createTemp() {
+		println "executing PrepareTempTask"
+
+		if( !tempDir.exists() ) {
+			if(tempDir.mkdirs()) {
+				//println("succeeded in making folder")
+			}
+		}
+	}
+
+	def copyResources() {
+		project.copy {
+			//from manifestFile
+			from sourcesFiles
+			from resourcesFiles
+			into tempDir
+		}
+	}
+
+	def copyEnvResources() {
+		def envResources = project.fileTree(dir: envPath, include: '**/*')
+
+		project.copy {
+			from envResources
+			into project.properties.tempDirProp + "/data"
+		}
+	}
+
+	def removeTraces() {
+		// source folder		
+		FileTree codeFiles = project.fileTree(project.properties.tempDirProp + '/source') {
+			include '**/*.brs'
+		}
+
+		String regex = 'Logger\\(\\).init\\(.*'
+		regex += "|Logger\\(\\).scLog\\(.*"
+		regex += "|Logger\\(\\).info\\(.*"
+		regex += "|Logger\\(\\).warn\\(.*"
+		regex += "|Logger\\(\\).error\\(.*"
+		regex += "|Logger\\(\\).network\\(.*"
+		regex += "|Logger\\(\\).sendCrashLog\\(.*"
+		regex += "|print .*"
+
+		codeFiles.each { File codeFile ->
+			//println "Start replacing regex on $codeFile.name"
+			if (codeFile.name != "Logger.brs")
+			{
+				String content = codeFile.getText()
+				content = content.replaceAll(regex, "")
+				codeFile.setText(content)
+			}
+		}
+
+		// scene graph folder		
+		codeFiles = project.fileTree(project.properties.tempDirProp + '/components') {
+			include '**/*.brs'
+		}
+
+		regex = 'm.global.log.*'
+		regex += "|print .*"
+
+		codeFiles.each { File codeFile ->
+			String content = codeFile.getText()
+			content = content.replaceAll(regex, "")
+			codeFile.setText(content)
+		}
+	}
+
+	def zipTemp() {
+		Properties props = new Properties()
+		props.load(new FileInputStream(project.properties.tempDirProp + "/manifest"))
+
+		def arcName = "axis_" + project.buildEnv + "_" + appMajorVersion + "_" + appMinorVersion + "_" + appBuildNumber + ".zip"
+		println "building zip " + arcName
+
+		project.ext.set("archiveName", arcName)
+		project.ext.set("archiveFile", "output/" + arcName)
+
+		project.delete("output/" + arcName)
+
+		project.task("zipResources", type: Zip) {
+			destinationDir = outputDir
+			archiveName arcName
+			from tempDir
+		}.execute()
+	}
+
+	def destroyTemp() {
+		project.delete(project.properties.tempDirProp)
+	}
+}
+
+// build production app
+class DeeplinkTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		def contentID = ""
+		def mediaType = ""
+
+		if (project.hasProperty('contentID') && project.hasProperty('mediaType')){
+			contentID = project.getProperty('contentID')
+			mediaType = project.getProperty('mediaType')
+		}
+		else
+		{
+			throw new GradleException("Call deeplink with a contentID and type parameters, for example : gradle deeplink -PcontentID=83330 -PmediaType=movie")
+		}
+
+		println "0. Init variables"
+		def initForDeeplink = project.task('initForDeeplink', type: InitVariablesTask)
+		initForDeeplink.execute()
+
+		println "1. Deep link sent to " + project.ext.get("rokuIP") + ", contentID=" + contentID + ", MediaType=" + mediaType
+		project.exec {
+			executable "curl"
+			args "-s"
+			args "-S"
+			args "-d", ''
+			args "http://" + project.ext.get("rokuIP") + ":8060/launch/dev?contentID=" + contentID + "&MediaType=" + mediaType
+		}
+	}
+}
+
+class PackagingPublicChannelTask extends DefaultTask {
+	@TaskAction
+	def constructor() {
+		project.ext.set('publicChannel', true)
+
+		def regularPackaging = project.task('regularPackaging', type: PackagingTask)
+		regularPackaging.packageForEnvironment('production', true)
+	}
+}
+
+class PackagingTask extends DefaultTask {
+	def initForPackage
+	def htmlResponse
+	def environment
+	def appMajorVersion = "0"
+	def appMinorVersion = "0"
+	def appBuildNumber = "0"
+
+	Properties props
+
+	@TaskAction
+	def constructor() {
+		if (project.hasProperty('env')){
+			packageForEnvironment(project.getProperty('env'), false)
+		}
+		else
+		{
+			throw new GradleException("Please provide an environment to build (test/staging/production), for example : gradle packageApp -Penv=production")
+		}
+	}
+
+	def packageForEnvironment(String env, Boolean publicChannel) {
+		environment = env
+
+		println "0. Init variables"
+		initVars()
+
+		println "2. installApp for environment " + environment
+		def installForPackaging
+		switch (environment.toLowerCase())
+		{
+			case "test":
+				installForPackaging = project.task('buildForPackaging', type: InstallTestTask)
+				break;
+			case "staging":
+				installForPackaging = project.task('buildForPackaging', type: InstallStagingTask)
+				break;
+			case "production":
+				installForPackaging = project.task('buildForPackaging', type: InstallProductionTask)
+				break;
+			default:
+				throw new GradleException("Provided environment is not supported: " + environment)
+		}
+		installForPackaging.execute()
+
+		println "1. create package"
+		createPackage()
+
+		//print "htmlResponse " + htmlResponse
+
+		def result = downloadPackage(environment, publicChannel)
+		switch (result){
+			case 1:
+				println "-> no pkg found, please make sure the app is running on the box."
+				break;
+			case 2:
+				println "-> pkg could not be downloaded."
+				break;
+			case 3:
+				println "-> dev key is not set on your roku, execute 'gradle rekey' and try again"
+				break;
+			default:
+				println "-> pkg downloaded to output"
+		}
+	}
+
+	def createPackage() {
+		def appName = "axis_" + appMajorVersion + "_" + appMinorVersion + "_" + appBuildNumber
+
+		def pkgPath = ""
+		def pkgCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+				args "--digest"
+				args "-s"
+				args "-S"
+				args "-f"
+				args "-F", "mysubmit=Package"
+				args "-F", "app_name=" + appName
+				args "-F", "passwd=" + project.properties.packagingPassword
+				args "-F", "pkg_time=" + System.currentTimeMillis()
+				args "http://" + project.ext.get("rokuIP") + "/plugin_package"
+			}
+			pkgPath = os
+		}
+
+		htmlResponse = pkgCmd.toString()
+	}
+
+	def downloadPackage(String env, Boolean publicChannel){
+		// check devID
+		def startIndex = htmlResponse.indexOf('</label> ')
+		def endIndex = htmlResponse.indexOf('</label>', startIndex + 9)
+		def devID = htmlResponse.substring(startIndex + 9, endIndex)
+		
+		if (devID == "") return 3
+
+		println "using DevID: '" + devID + "'"
+
+		// check pkg url
+		startIndex = htmlResponse.indexOf('<a href="pkgs//')
+				
+		if (startIndex == -1) return 1
+		
+		endIndex = htmlResponse.indexOf('">', startIndex)
+		def pkgUrl = htmlResponse.substring(startIndex + 9, endIndex)
+	
+		def pkgName = pkgUrl.split("//")[1]
+		def pkgSource = "http://" + project.ext.get("rokuIP") + "/pkgs/" + pkgName
+		
+		def pkgDestination
+		if (!publicChannel)
+			pkgDestination = "output/privateChannel_" + env + ".pkg"
+		else
+			pkgDestination = "output/publicChannel.pkg"
+
+		project.ext.set("pkgFile", pkgDestination)
+
+		println "2. download package name"
+		def downloadCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+				args "--digest"
+				args pkgSource
+				args "--output"
+				args pkgDestination
+			}
+			def temp = os
+		}
+
+		File file = new File(pkgDestination)  
+		if (file.length() < 10000){
+			project.delete pkgDestination
+			return 2
+		}
+
+		return 0
+	}
+
+	def initVars() {
+		initForPackage = project.task('initForPackage', type: InitVariablesTask)
+		initForPackage.execute()
+
+		props = new Properties()
+		props.load(new FileInputStream("manifest"))
+
+		def majNumber = System.getenv("bamboo_MajorVersion")
+		if (majNumber != null) appMajorVersion = majNumber
+
+		def minNumber = System.getenv("bamboo_MinorVersion")
+		if (minNumber != null) appMinorVersion = minNumber
+
+		def buildNumber = System.getenv("bamboo_VersionBuildNumber")
+		if (buildNumber != null) appBuildNumber = buildNumber
+	
+	}
+}
+
+class RekeyTask extends DefaultTask {
+	def initForPackage
+	def htmlResponse
+	Properties props
+
+	@TaskAction
+	def constructor() {
+		println "0. Init variables"
+		initVars()
+
+		println "1. get first valid pkg"
+		FileTree pkgFiles = project.fileTree(project.properties.packagingDir){
+			include '**/*.pkg'
+		}
+		def pkgFile = pkgFiles.getFiles()[0]
+		if (pkgFile == null){
+			throw new GradleException("You need at least 1 pkg file in folder:'" + project.properties.packagingDir + "'.\n You can use package task to create one and move it to 'package' folder.")
+		}
+
+		println "2. rekey with: " + pkgFile.toString()
+
+		def pkgPath = ""
+		def keyCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+				args "--digest"
+				args "-s"
+				args "-S"
+				args "-f"
+				args "-F", "mysubmit=Rekey"
+				args "-F", "archive=@" + pkgFile.toString()
+				args "-F", "passwd=" + project.properties.packagingPassword
+				args "http://" + project.ext.get("rokuIP") + "/plugin_inspect"
+			}
+			pkgPath = os
+		}
+
+		htmlResponse = keyCmd.toString()
+
+		println "reKey successful, you can now package the app"
+	}
+
+	def initVars() {
+		initForPackage = project.task('initForPackage', type: InitVariablesTask)
+		initForPackage.execute()
+
+		props = new Properties()
+		props.load(new FileInputStream("manifest"))
+	}
+}
+
+class ScreenshotTask extends DefaultTask {
+	def initForPackage
+	def htmlResponse
+	Properties props
+
+	@TaskAction
+	def constructor() {
+		println "0. Init variables"
+		initVars()
+
+		println "1. take snapshot "
+
+		def pkgPath = ""
+		def keyCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+				args "--digest"
+				args "-s"
+				args "-S"
+				args "-f"
+				args "-F", "archive="
+				args "-F", "passwd="
+				args "-F", "mysubmit=Screenshot"
+				args "http://" + project.ext.get("rokuIP") + "/plugin_inspect"
+			}
+			pkgPath = os
+		}
+
+		htmlResponse = keyCmd.toString()
+
+		def startIndex = htmlResponse.indexOf('<img src="')
+		def endIndex = htmlResponse.indexOf('">', startIndex + 10)
+		def screenshotSrc = "http://" + project.ext.get("rokuIP") + "/" + htmlResponse.substring(startIndex + 10, endIndex)
+		def userDesktop = System.getProperty("user.home", "localhost") + "/Desktop"
+		def destName = userDesktop + "/axis_" + System.currentTimeMillis() + ".jpg"
+
+		println "3. download jpg "
+		def downloadCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "--user", project.properties.rokuDevLogin + ":" + project.properties.rokuDevPassword
+				args "--digest"
+				args screenshotSrc
+				args "--output"
+				args destName
+			}
+			def temp = os
+		}
+
+		File file = new File(destName)  
+		if (file.length() < 10000){
+			project.delete destName
+			return 2
+		}
+
+		println "jpg saved"
+	}
+
+	def initVars() {
+		initForPackage = project.task('initForPackage', type: InitVariablesTask)
+		initForPackage.execute()
+
+		props = new Properties()
+		props.load(new FileInputStream("manifest"))
+	}
+}
+
+class GlobaSearchTask extends DefaultTask {
+	String searchQuery
+
+	@TaskAction
+	def constructor() {
+		if (project.hasProperty('query')){
+			searchQuery = project.getProperty('query')
+		}
+		else
+		{
+			throw new GradleException("Please provide an query to search, for example : gradle globalSearch -Pquery='fifth element'")
+		}
+
+		println "0. Init variables"
+		initVars()
+
+		def targetSearch = "http://" + project.ext.get("rokuIP") + ":8060/search/browse?keyword=" + URLEncoder.encode(searchQuery, "UTF-8")
+
+		println "1. start search for " + targetSearch
+
+		def pkgPath = ""
+		def keyCmd = new ByteArrayOutputStream().withStream { os ->
+			def result = project.exec {
+				executable "curl"
+				standardOutput = os
+				args "-d", ""
+				args targetSearch
+			}
+			pkgPath = os
+		}
+
+		def htmlResponse = keyCmd.toString()
+	}
+
+	def initVars() {
+		def initForGS = project.task('initForGS', type: InitVariablesTask)
+		initForGS.execute()
+	}
+}
+
+

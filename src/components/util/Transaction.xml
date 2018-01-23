@@ -1,0 +1,18 @@
+<?rokuml version="1.0" encoding="utf-8" ?>
+
+<component name="Transaction" extends="Task" >
+
+  <interface>
+    <field id="request" type="string"/>
+    <field id="response" type="string"/>
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/util/Transaction.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/transactions/HttpTransaction.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/transactions/HttpsTransaction.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/transactions/PkgTransaction.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/transactions/RegistryTransaction.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/transactions/TransactionFactory.brs" />
+  <script type="text/brightscript" uri="pkg:/source/utils/debug/Debug.brs" />
+
+</component>
